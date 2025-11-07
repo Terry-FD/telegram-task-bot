@@ -133,5 +133,9 @@ async def main():
     await app.run_polling()  # 新写法，自动初始化 + 启动 + 监听
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import asyncio
+
+    print("🤖 Task Bot is running and listening for commands...")
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
 
