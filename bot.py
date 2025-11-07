@@ -1,14 +1,30 @@
 import os
 import asyncio
+import threading
+import http.server
+import socketserver
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# Each chat (group/private) has its own task list:
-# { chat_id: [(task_text, msg_id, added_by)] }
+# === 伪造 HTTP 监听端口 (Render 免费层用) ===
+PORT = int(os.environ.get("PORT", 10000))
+
+def run_server():
+    handler = http.server.SimpleHTTPRequestHandler
+    with socketserver.TCPServer(("", PORT), handler) as httpd:
+        print(f"🌐 Fake HTTP server running on port {PORT}")
+        httpd.serve_forever()
+
+# 在后台线程中启动伪HTTP服务
+threading.Thread(target=run_server, daemon=True).start()
+
+
+# === Telegram 任务逻辑 ===
 tasks_by_chat = {}
 
 def get_tasks_for(chat_id: int):
     return tasks_by_chat.setdefault(chat_id, [])
+
 
 # --- /start ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -23,6 +39,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Use /help to view all commands."
     )
 
+
 # --- /help ---
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -35,6 +52,7 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ℹ️ `/help` — Show this help message\n",
         parse_mode="Markdown"
     )
+
 
 # --- /add ---
 async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -53,6 +71,7 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tasks.append((task_text, msg_id, added_by))
     await update.message.reply_text(f"✅ Task added: {task_text} (by {added_by})")
 
+
 # --- /list ---
 async def list_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -64,6 +83,7 @@ async def list_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     lines = [f"{i+1}. {t[0]} (by {t[2]})" for i, t in enumerate(tasks)]
     await update.message.reply_text("📝 Current tasks in this chat:\n" + "\n".join(lines))
+
 
 # --- /goto ---
 async def goto_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -86,6 +106,7 @@ async def goto_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     task_text, msg_id, added_by = tasks[index]
     await update.message.reply_text(f"📎 Original task (by {added_by}) 👇", reply_to_message_id=msg_id)
 
+
 # --- /done ---
 async def done_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -107,13 +128,15 @@ async def done_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finished_text, _, added_by = tasks.pop(index)
     await update.message.reply_text(f"✅ Completed and removed: {finished_text} (added by {added_by})")
 
+
 # --- /clear ---
 async def clear_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     tasks_by_chat[chat_id] = []
     await update.message.reply_text("🧹 All tasks in this chat have been cleared.")
 
-# --- Build app from env var token (for Render/Railway) ---
+
+# --- Build app ---
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
     raise RuntimeError("BOT_TOKEN environment variable is not set.")
@@ -127,15 +150,11 @@ app.add_handler(CommandHandler("goto", goto_task))
 app.add_handler(CommandHandler("done", done_task))
 app.add_handler(CommandHandler("clear", clear_tasks))
 
-# --- Run main loop ---
+
+# --- Run ---
 if __name__ == "__main__":
-    import asyncio
     print("🤖 Task Bot is running and listening for commands...")
-
-    # 直接运行，无需 async def main() 包裹
     app.run_polling(
-        allowed_updates=Update.ALL_TYPES,  # 可选参数：允许所有更新类型
-        close_loop=False                   # ✅ 防止 Render 平台的 loop 被错误关闭
+        allowed_updates=Update.ALL_TYPES,
+        close_loop=False  # ✅ 防止 Render 报错 "Cannot close a running event loop"
     )
-
-
