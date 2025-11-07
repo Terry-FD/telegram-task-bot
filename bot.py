@@ -128,14 +128,14 @@ app.add_handler(CommandHandler("done", done_task))
 app.add_handler(CommandHandler("clear", clear_tasks))
 
 # --- Run main loop ---
-async def main():
-    print("🤖 Task Bot is running and listening for commands...")
-    await app.run_polling()  # 新写法，自动初始化 + 启动 + 监听
-
 if __name__ == "__main__":
     import asyncio
-
     print("🤖 Task Bot is running and listening for commands...")
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+
+    # 直接运行，无需 async def main() 包裹
+    app.run_polling(
+        allowed_updates=Update.ALL_TYPES,  # 可选参数：允许所有更新类型
+        close_loop=False                   # ✅ 防止 Render 平台的 loop 被错误关闭
+    )
+
 
