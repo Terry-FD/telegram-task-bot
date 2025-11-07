@@ -129,11 +129,8 @@ app.add_handler(CommandHandler("clear", clear_tasks))
 
 # --- Run main loop ---
 async def main():
-    await app.initialize()
-    await app.start()
     print("🤖 Task Bot is running and listening for commands...")
-    await app.updater.start_polling()
-    await asyncio.Event().wait()
+    await app.run_polling()  # 新写法，自动初始化 + 启动 + 监听
 
 if __name__ == "__main__":
     asyncio.run(main())
